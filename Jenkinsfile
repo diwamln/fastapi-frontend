@@ -16,10 +16,9 @@ pipeline {
         TEST_API_URL = 'http://192.168.89.127:30093' 
         PROD_API_URL = 'http://192.168.89.127:30094' 
         
-        // --- PATH MANIFEST (Supaya Rapi & Tidak Salah Path) ---
-        // Sesuaikan dengan struktur foldermu
+        // --- PATH MANIFEST ---
         MANIFEST_TEST_PATH = 'fastapi-frontend/dev/deployment.yaml'
-        MANIFEST_PROD_PATH = 'fastapi-frontend/prod/deployment.yaml' // <--- Pastikan folder prod sudah ada!
+        MANIFEST_PROD_PATH = 'fastapi-frontend/prod/deployment.yaml' 
     }
 
     stages {
@@ -40,11 +39,11 @@ pipeline {
         stage('Build & Push (TEST Image)') {
             steps {
                 script {
+                    // Build di Root Workspace (.)
                     docker.withRegistry('', DOCKER_CREDS) {
                         def testTag = "${env.BASE_TAG}-test"
                         echo "Building TEST Image connect to: ${env.TEST_API_URL}"
                         
-                        // Build image dengan menyuntikkan URL TEST
                         def testImage = docker.build("${DOCKER_IMAGE}:${testTag}", "--build-arg VITE_API_URL=${env.TEST_API_URL} .")
                         testImage.push()
                     }
@@ -59,18 +58,16 @@ pipeline {
                     dir('temp_manifests') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDS, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                             
-                            // 1. Clone
                             sh "git clone https://${GIT_USER}:${GIT_PASS}@${MANIFEST_REPO_URL} ."
                             sh 'git config user.email "jenkins@bot.com"'
                             sh 'git config user.name "Jenkins Pipeline"'
                             
-                            // 2. Update YAML (Pakai variabel path agar aman)
+                            // Update YAML TEST
                             sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-test|g' ${MANIFEST_TEST_PATH}"
                             
-                            // 3. Push dengan Pengecekan (FIX ERROR EXIT CODE 1)
+                            // Safe Commit
                             sh """
                                 git add .
-                                # Cek apakah ada perubahan di index git?
                                 if ! git diff-index --quiet HEAD; then
                                     git commit -m 'Deploy TEST: ${env.BASE_TAG}-test [skip ci]'
                                     git push origin main
@@ -99,17 +96,16 @@ pipeline {
         stage('Build & Push (PROD Image)') {
             steps {
                 script {
-                    dir('frontend') { // Pastikan Dockerfile ada di folder 'frontend'
-                        docker.withRegistry('', DOCKER_CREDS) {
-                            def prodTag = "${env.BASE_TAG}-prod"
-                            echo "Building PROD Image connect to: ${env.PROD_API_URL}"
-                            
-                            // Build ULANG dengan URL PROD + No Cache
-                            def prodImage = docker.build("${DOCKER_IMAGE}:${prodTag}", "--no-cache --build-arg VITE_API_URL=${env.PROD_API_URL} .")
-                            
-                            prodImage.push()
-                            prodImage.push('latest')
-                        }
+                    // PERBAIKAN DI SINI:
+                    // Hapus dir('frontend') agar konsisten dengan stage TEST
+                    docker.withRegistry('', DOCKER_CREDS) {
+                        def prodTag = "${env.BASE_TAG}-prod"
+                        echo "Building PROD Image connect to: ${env.PROD_API_URL}"
+                        
+                        def prodImage = docker.build("${DOCKER_IMAGE}:${prodTag}", "--no-cache --build-arg VITE_API_URL=${env.PROD_API_URL} .")
+                        
+                        prodImage.push()
+                        prodImage.push('latest')
                     }
                 }
             }
@@ -123,10 +119,10 @@ pipeline {
                             
                             sh "git pull origin main"
                             
-                            // Update file PROD (Perhatikan variabel PATH yg dipakai)
+                            // Update YAML PROD
                             sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-prod|g' ${MANIFEST_PROD_PATH}"
                             
-                            // Push dengan Pengecekan
+                            // Safe Commit
                             sh """
                                 git add .
                                 if ! git diff-index --quiet HEAD; then
