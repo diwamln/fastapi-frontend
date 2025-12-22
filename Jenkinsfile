@@ -69,7 +69,7 @@ pipeline {
                             
                             // 2. Update file test.yaml (Sesuaikan path folder di repo manifest Anda)
                             // Misal strukturnya: frontend/test.yaml
-                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-test|g' frontend/k8s/test.yaml"
+                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-test|g' fastapi-backend/dev/deployment.yaml"
                             
                             // 3. Push Perubahan
                             sh "git add ."
@@ -122,7 +122,7 @@ pipeline {
                             sh "git pull origin main"
                             
                             // Update file prod.yaml (Sesuaikan path folder di repo manifest Anda)
-                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-prod|g' frontend/k8s/prod.yaml"
+                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-prod|g' fastapi-backend/dev/deployment.yaml"
                             
                             sh "git add ."
                             sh "git commit -m 'Promote PROD: ${env.BASE_TAG}-prod [skip ci]'"
