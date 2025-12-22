@@ -10,13 +10,13 @@ pipeline {
         GIT_CREDS    = 'git-token'
         
         // URL Repo Manifest
-        MANIFEST_REPO_URL = 'github.com/diwamln/intern-devops-manifests' 
+        MANIFEST_REPO_URL = 'github.com/diwamln/intern-devops-manifests.git' 
         
-        // --- URL BACKEND ---
+        // --- URL BACKEND (Akan dibakar ke dalam Image Frontend) ---
         TEST_API_URL = 'http://192.168.89.127:30093' 
         PROD_API_URL = 'http://192.168.89.127:30094' 
         
-        // --- PATH MANIFEST ---
+        // --- PATH FILE MANIFEST ---
         MANIFEST_TEST_PATH = 'fastapi-frontend/dev/deployment.yaml'
         MANIFEST_PROD_PATH = 'fastapi-frontend/prod/deployment.yaml' 
     }
@@ -39,11 +39,11 @@ pipeline {
         stage('Build & Push (TEST Image)') {
             steps {
                 script {
-                    // Build di Root Workspace (.)
                     docker.withRegistry('', DOCKER_CREDS) {
                         def testTag = "${env.BASE_TAG}-test"
                         echo "Building TEST Image connect to: ${env.TEST_API_URL}"
                         
+                        // Build image
                         def testImage = docker.build("${DOCKER_IMAGE}:${testTag}", "--build-arg VITE_API_URL=${env.TEST_API_URL} .")
                         testImage.push()
                     }
@@ -62,17 +62,23 @@ pipeline {
                             sh 'git config user.email "jenkins@bot.com"'
                             sh 'git config user.name "Jenkins Pipeline"'
                             
-                            // Update YAML TEST
-                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-test|g' ${MANIFEST_TEST_PATH}"
+                            // === THE FIX ===
+                            // Menggunakan regex (docker.io/)? agar cocok dengan YAML kamu yang ada tulisan docker.io-nya
+                            sh "sed -i -E 's|image: (docker.io/)?${DOCKER_IMAGE}:.*|image: docker.io/${DOCKER_IMAGE}:${env.BASE_TAG}-test|g' ${MANIFEST_TEST_PATH}"
                             
-                            // Safe Commit
+                            // DEBUG: Print hasil perubahan ke console log biar kamu yakin
+                            echo "--- HASIL UPDATE YAML TEST ---"
+                            sh "cat ${MANIFEST_TEST_PATH} | grep image:"
+                            echo "------------------------------"
+                            
+                            // Push dengan Safety Check (Biar ga error exit code 1)
                             sh """
                                 git add .
                                 if ! git diff-index --quiet HEAD; then
                                     git commit -m 'Deploy TEST: ${env.BASE_TAG}-test [skip ci]'
                                     git push origin main
                                 else
-                                    echo "Tidak ada perubahan pada manifest TEST, skip commit."
+                                    echo "WARNING: Tidak ada perubahan di file YAML. Cek regex sed!"
                                 fi
                             """
                         }
@@ -96,8 +102,7 @@ pipeline {
         stage('Build & Push (PROD Image)') {
             steps {
                 script {
-                    // PERBAIKAN DI SINI:
-                    // Hapus dir('frontend') agar konsisten dengan stage TEST
+                    // Konsisten: Build di Root, jangan masuk folder frontend
                     docker.withRegistry('', DOCKER_CREDS) {
                         def prodTag = "${env.BASE_TAG}-prod"
                         echo "Building PROD Image connect to: ${env.PROD_API_URL}"
@@ -105,7 +110,7 @@ pipeline {
                         def prodImage = docker.build("${DOCKER_IMAGE}:${prodTag}", "--no-cache --build-arg VITE_API_URL=${env.PROD_API_URL} .")
                         
                         prodImage.push()
-                        prodImage.push('latest')
+                        prodImage.push('latest') // Optional: Update latest tag di docker hub
                     }
                 }
             }
@@ -117,19 +122,18 @@ pipeline {
                     dir('temp_manifests') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDS, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                             
-                            sh "git pull origin main"
+                            sh "git pull origin main" // Tarik update terbaru
                             
-                            // Update YAML PROD
-                            sh "sed -i 's|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${env.BASE_TAG}-prod|g' ${MANIFEST_PROD_PATH}"
+                            // === THE FIX JUGA DI SINI ===
+                            sh "sed -i -E 's|image: (docker.io/)?${DOCKER_IMAGE}:.*|image: docker.io/${DOCKER_IMAGE}:${env.BASE_TAG}-prod|g' ${MANIFEST_PROD_PATH}"
                             
-                            // Safe Commit
                             sh """
                                 git add .
                                 if ! git diff-index --quiet HEAD; then
                                     git commit -m 'Promote PROD: ${env.BASE_TAG}-prod [skip ci]'
                                     git push origin main
                                 else
-                                    echo "Tidak ada perubahan pada manifest PROD, skip commit."
+                                    echo "WARNING: Tidak ada perubahan di file YAML PROD."
                                 fi
                             """
                         }
