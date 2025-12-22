@@ -42,7 +42,6 @@ pipeline {
         stage('Build & Push (TEST Image)') {
             steps {
                 script {
-                    dir('frontend') {
                         docker.withRegistry('', DOCKER_CREDS) {
                             def testTag = "${env.BASE_TAG}-test"
                             echo "Building TEST Image connect to: ${env.TEST_API_URL}"
@@ -51,7 +50,6 @@ pipeline {
                             def testImage = docker.build("${DOCKER_IMAGE}:${testTag}", "--build-arg VITE_API_URL=${env.TEST_API_URL} .")
                             testImage.push()
                         }
-                    }
                 }
             }
         }
