@@ -13,8 +13,8 @@ pipeline {
         MANIFEST_REPO_URL = 'github.com/diwamln/intern-devops-manifests.git' 
         
         // --- URL BACKEND (Akan dibakar ke dalam Image Frontend) ---
-        TEST_API_URL = 'http://192.168.89.127:30093' 
-        PROD_API_URL = 'http://192.168.89.127:30094' 
+        TEST_API_URL = 'http://k8s-01.naratel.net.id:30093/' 
+        PROD_API_URL = 'http://k8s-01.naratel.net.id:30094/' 
         
         // --- PATH FILE MANIFEST ---
         MANIFEST_TEST_PATH = 'fastapi-frontend/dev/deployment.yaml'
