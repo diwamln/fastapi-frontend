@@ -1,5 +1,27 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            // Kita definisikan spec Pod langsung di sini (Infrastructure as Code)
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: docker
+    image: docker:24.0.6-dind
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: dind-storage
+      mountPath: /var/lib/docker
+  - name: jnlp
+    image: jenkins/inbound-agent:latest
+  volumes:
+  - name: dind-storage
+    emptyDir: {}
+'''
+        }
+    }
 
     environment {
         // --- KONFIGURASI DOCKER ---
